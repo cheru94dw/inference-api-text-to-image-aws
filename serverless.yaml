@@ -1,0 +1,47 @@
+service: inference-text-to-image-service # NOTE: update this with your service name
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+
+functions:
+  hello:
+    handler: index.handler
+
+
+resources:
+  Resources:
+    Model:
+      Type: AWS::SageMaker::Model
+      Properties:
+        Containers:
+          - ModelPackageName: !Ref ModelPackageName
+        ExecutionRoleArn: !Ref ModelExecutionRoleArn
+
+    EndpointConfig:
+      Type: AWS::SageMaker::EndpointConfig
+      Properties:
+        ProductionVariants:
+          - InitialInstanceCount: !Ref EndpointInstanceCount
+            InitialVariantWeight: 1.0
+            InstanceType: !Ref EndpointInstanceType
+            ModelName: !GetAtt Model.ModelName
+            VariantName: AllTraffic
+        DataCaptureConfig:
+            EnableCapture: !Ref EnableDataCapture 
+            InitialSamplingPercentage: !Ref SamplingPercentage
+            DestinationS3Uri: !Ref DataCaptureUploadPath
+            CaptureOptions:
+              - CaptureMode: Input
+              - CaptureMode: Output
+            CaptureContentTypeHeader:
+              CsvContentTypes:
+                - "text/csv"
+
+    Endpoint:
+      Type: AWS::SageMaker::Endpoint
+      Properties:
+        EndpointName: !Sub ${SageMakerProjectName}-${StageName}
+        EndpointConfigName: !GetAtt EndpointConfig.EndpointConfigName
